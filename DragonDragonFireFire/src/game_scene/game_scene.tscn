@@ -1,0 +1,108 @@
+[gd_scene format=3 uid="uid://bbxryce6ob4pc"]
+
+[ext_resource type="Script" uid="uid://cou2py78batyp" path="res://game_scene/game_scene.gd" id="1_k340r"]
+[ext_resource type="PackedScene" uid="uid://0b8gkxjmmmak" path="res://stages/hello_walker.tscn" id="1_n4lbc"]
+[ext_resource type="PackedScene" uid="uid://8d30jhpgc64o" path="res://ui/game_ui.tscn" id="2_m1k14"]
+[ext_resource type="Script" uid="uid://bvh2cr587fm7k" path="res://game_scene/time_controller.gd" id="3_3kg8t"]
+[ext_resource type="PackedScene" uid="uid://itqfe8lse353" path="res://player/player_cutscene.tscn" id="3_8l73x"]
+[ext_resource type="PackedScene" uid="uid://vqnw6jvlujgw" path="res://effects/transition_rect.tscn" id="3_mw77h"]
+[ext_resource type="PackedScene" uid="uid://pwy1g0xius4r" path="res://ui/pause_overlay.tscn" id="4_e0oqy"]
+[ext_resource type="Shader" uid="uid://cew32kpokoxdg" path="res://shaders/incinerate.gdshader" id="6_mw77h"]
+[ext_resource type="Script" uid="uid://djmjyhwmjdg5l" path="res://enemies/enemy_controller.gd" id="9_mw77h"]
+[ext_resource type="Script" uid="uid://6cwc5sby7nvt" path="res://addons/godot_rl_agents/sync.gd" id="10_mmqx0"]
+[ext_resource type="PackedScene" uid="uid://dk42xswvh07t0" path="res://player/player.tscn" id="11_fx1fl"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fx1fl"]
+shader = ExtResource("6_mw77h")
+shader_parameter/fade_duration = 0.30000001355148
+shader_parameter/step_delay = 0.10000000475
+shader_parameter/current_time = 0.0
+
+[sub_resource type="Shader" id="Shader_fx1fl"]
+resource_local_to_scene = true
+code = "shader_type canvas_item;
+
+uniform float clear_progress : hint_range(0.0, 1.0) = 0.0; // 0 -> 1 where 1 is fully cleared.
+
+void fragment()
+{
+    vec4 tex_color = texture(TEXTURE, UV);
+
+	// Figure out which pixel we are in the texture (integer coords) and if they are odd/even.
+    ivec2 px = ivec2(floor(UV / TEXTURE_PIXEL_SIZE));
+    int x_odd = px.x & 1;
+    int y_odd = px.y & 1;
+    
+    float sweepA = (UV.x + UV.y) * 0.5;
+	float sweepB = (UV.x + (1.0 - UV.y)) * 0.5;
+	float sweepC = ((1.0 - UV.x) + UV.y) * 0.5;
+	float sweepD = ((1.0 - UV.x) + (1.0 - UV.y)) * 0.5;
+
+	float sweep = sweepA;
+    if (x_odd == 1 && y_odd == 1) {
+        sweep = sweepB;
+    } else if (x_odd == 1 && y_odd == 0) {
+        sweep = sweepC;
+    } else if (x_odd == 0 && y_odd == 1) {
+        sweep = sweepD;
+    }
+    
+    if (sweep <= clear_progress) {
+        // Cleared pixel → make transparent
+        COLOR = vec4(tex_color.rgb, 0.0);
+    } else {
+        // Black with full alpha.
+        COLOR = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+}
+"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_adbct"]
+resource_local_to_scene = true
+shader = SubResource("Shader_fx1fl")
+shader_parameter/clear_progress = 1.0
+
+[node name="GameScene" type="Node2D" unique_id=1250721174]
+script = ExtResource("1_k340r")
+
+[node name="Stage1" parent="." unique_id=763194540 instance=ExtResource("1_n4lbc")]
+
+[node name="GameUI" parent="." unique_id=842278130 instance=ExtResource("2_m1k14")]
+
+[node name="PlayerCutscene" parent="." unique_id=848225277 instance=ExtResource("3_8l73x")]
+material = SubResource("ShaderMaterial_fx1fl")
+position = Vector2(-8, 172)
+
+[node name="PauseOverlay" parent="." unique_id=504408584 instance=ExtResource("4_e0oqy")]
+visible = false
+
+[node name="GameOverLabel" type="Label" parent="." unique_id=2117190860]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 120.0
+offset_top = 88.0
+offset_right = 224.0
+offset_bottom = 96.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "TIME OVER!"
+
+[node name="TransitionRect" parent="." unique_id=1586586090 instance=ExtResource("3_mw77h")]
+material = SubResource("ShaderMaterial_adbct")
+custom_minimum_size = Vector2(320, 180)
+
+[node name="TimeController" type="Node" parent="." unique_id=1240468612]
+script = ExtResource("3_3kg8t")
+
+[node name="EnemyController" type="Node" parent="." unique_id=798060351]
+script = ExtResource("9_mw77h")
+
+[node name="Sync" type="Node" parent="." unique_id=382008089]
+script = ExtResource("10_mmqx0")
+metadata/_custom_type_script = "uid://6cwc5sby7nvt"
+
+[node name="Player" parent="." unique_id=1110192731 instance=ExtResource("11_fx1fl")]
+position = Vector2(32, 172)

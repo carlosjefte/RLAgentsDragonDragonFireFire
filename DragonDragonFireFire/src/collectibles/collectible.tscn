@@ -1,0 +1,84 @@
+[gd_scene load_steps=10 format=3 uid="uid://s471kpgknaxv"]
+
+[ext_resource type="Script" uid="uid://8lx35134fwif" path="res://collectibles/collectible.gd" id="1_mctxo"]
+[ext_resource type="Shader" uid="uid://b20o28llb12ur" path="res://shaders/bling_shader.gdshader" id="2_m0tds"]
+[ext_resource type="PackedScene" uid="uid://dosfp58oaoyid" path="res://physics_behaviors/stuck_inside_geometry_component.tscn" id="3_k5esu"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_mctxo"]
+size = Vector2(12, 12)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_k5esu"]
+resource_local_to_scene = true
+shader = ExtResource("2_m0tds")
+shader_parameter/progress = 0.0
+shader_parameter/is_active = true
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_m0tds"]
+size = Vector2(12, 12)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_mctxo"]
+radius = 16.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_k5esu"]
+size = Vector2(2, 2)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_pjpvi"]
+size = Vector2(10, 11)
+
+[node name="Collectible" type="CharacterBody2D"]
+collision_layer = 0
+collision_mask = 70
+script = ExtResource("1_mctxo")
+
+[node name="CollectibleArea" type="Area2D" parent="."]
+collision_layer = 32
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CollectibleArea"]
+position = Vector2(0, -6)
+shape = SubResource("RectangleShape2D_mctxo")
+debug_color = Color(0.6910079, 0.4935971, 0.1830126, 0.41960785)
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+material = SubResource("ShaderMaterial_k5esu")
+position = Vector2(0, -6)
+
+[node name="ShapeCastAnything" type="ShapeCast2D" parent="."]
+position = Vector2(0, -6)
+shape = SubResource("RectangleShape2D_m0tds")
+target_position = Vector2(0, 0)
+collision_mask = 119
+
+[node name="ShapeCastGeometry" type="ShapeCast2D" parent="."]
+position = Vector2(0, -6)
+shape = SubResource("RectangleShape2D_m0tds")
+target_position = Vector2(0, 0)
+collision_mask = 70
+
+[node name="ShapeCastObjectRange" type="ShapeCast2D" parent="."]
+position = Vector2(0, -6)
+shape = SubResource("CircleShape2D_mctxo")
+target_position = Vector2(0, 0)
+collision_mask = 33
+collide_with_areas = true
+
+[node name="ShapeCastValidGroundLeft" type="ShapeCast2D" parent="."]
+position = Vector2(-6, 0)
+shape = SubResource("RectangleShape2D_k5esu")
+target_position = Vector2(0, 0)
+collision_mask = 70
+
+[node name="ShapeCastValidGroundRight" type="ShapeCast2D" parent="."]
+position = Vector2(6, 0)
+shape = SubResource("RectangleShape2D_k5esu")
+target_position = Vector2(0, 0)
+collision_mask = 70
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -5.5)
+shape = SubResource("RectangleShape2D_pjpvi")
+debug_color = Color(0.65441453, 0.4481778, 0.6877562, 0.41960785)
+
+[node name="StuckInsideGeometryComponent" parent="." instance=ExtResource("3_k5esu")]
+position = Vector2(0, -6)
+
+[connection signal="body_entered" from="CollectibleArea" to="." method="_on_collectible_area_body_entered"]
