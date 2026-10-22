@@ -70,6 +70,7 @@ collision_mask = 64
 [node name="AIController2D" type="Node2D" parent="." unique_id=152124458 node_paths=PackedStringArray("_target_player")]
 script = ExtResource("6_g6k8r")
 _target_player = NodePath("..")
+control_mode = 2
 metadata/_custom_type_script = "uid://c653qopt5xya"
 
 [connection signal="body_entered" from="EnemyDetectionHitbox" to="." method="_on_enemy_detection_hitbox_body_entered"]

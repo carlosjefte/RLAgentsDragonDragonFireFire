@@ -67,6 +67,8 @@ script = ExtResource("1_k340r")
 
 [node name="Stage1" parent="." unique_id=763194540 instance=ExtResource("1_n4lbc")]
 
+[node name="Player2" parent="Stage1" unique_id=1110192731 instance=ExtResource("11_fx1fl")]
+
 [node name="GameUI" parent="." unique_id=842278130 instance=ExtResource("2_m1k14")]
 
 [node name="PlayerCutscene" parent="." unique_id=848225277 instance=ExtResource("3_8l73x")]
@@ -103,6 +105,3 @@ script = ExtResource("9_mw77h")
 [node name="Sync" type="Node" parent="." unique_id=382008089]
 script = ExtResource("10_mmqx0")
 metadata/_custom_type_script = "uid://6cwc5sby7nvt"
-
-[node name="Player" parent="." unique_id=1110192731 instance=ExtResource("11_fx1fl")]
-position = Vector2(32, 172)
