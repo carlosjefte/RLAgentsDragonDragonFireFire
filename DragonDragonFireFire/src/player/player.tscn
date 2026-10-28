@@ -5,7 +5,7 @@
 [ext_resource type="SpriteFrames" uid="uid://vq8ulwddi37x" path="res://player/player_sprite_frames_head.tres" id="2_yw30f"]
 [ext_resource type="PackedScene" uid="uid://d3i6n8ncflaq3" path="res://physics_behaviors/head_check_component.tscn" id="3_g1dw6"]
 [ext_resource type="PackedScene" uid="uid://dosfp58oaoyid" path="res://physics_behaviors/stuck_inside_geometry_component.tscn" id="5_qjkh3"]
-[ext_resource type="Script" uid="uid://c8are5bdqqk5j" path="res://player/dragon_agent_controller.gd" id="6_g6k8r"]
+[ext_resource type="Script" uid="uid://bkfhori1ycmag" path="res://player/player_ai_controller.gd" id="6_g6k8r"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_qjkh3"]
 radius = 6.0
@@ -20,57 +20,55 @@ radius = 4.0
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_qjkh3"]
 size = Vector2(12, 1)
 
-[node name="Player" type="CharacterBody2D" unique_id=1110192731 groups=["player"]]
+[node name="Player" type="CharacterBody2D" unique_id=1672886932 groups=["player"]]
 collision_mask = 70
 platform_on_leave = 2
 script = ExtResource("1_rkbax")
 
-[node name="Visuals" type="Node2D" parent="." unique_id=1573616131]
+[node name="Visuals" type="Node2D" parent="." unique_id=308220297]
 
-[node name="AnimatedSprite2DHead" type="AnimatedSprite2D" parent="Visuals" unique_id=552081816]
+[node name="AnimatedSprite2DHead" type="AnimatedSprite2D" parent="Visuals" unique_id=1867445713]
 position = Vector2(0, -8)
 sprite_frames = ExtResource("2_yw30f")
 animation = &"normal"
 
-[node name="AnimatedSprite2DBody" type="AnimatedSprite2D" parent="Visuals" unique_id=1294640607]
+[node name="AnimatedSprite2DBody" type="AnimatedSprite2D" parent="Visuals" unique_id=1842341118]
 position = Vector2(0, -8)
 sprite_frames = ExtResource("1_oul6g")
 animation = &"idle"
 autoplay = "idle"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1559375676]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=2029614436]
 position = Vector2(0, -6.5)
 shape = SubResource("CapsuleShape2D_qjkh3")
 
-[node name="HeadCheckComponent" parent="." unique_id=1190744541 instance=ExtResource("3_g1dw6")]
+[node name="HeadCheckComponent" parent="." unique_id=42630525 instance=ExtResource("3_g1dw6")]
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="HeadCheckComponent" unique_id=1198946410]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HeadCheckComponent" unique_id=648033983]
 position = Vector2(0, -12)
 shape = SubResource("RectangleShape2D_yw30f")
 debug_color = Color(0.96020204, 0, 0.52006775, 0.41960785)
 
-[node name="StuckInsideGeometryComponent" parent="." unique_id=336315414 instance=ExtResource("5_qjkh3")]
+[node name="StuckInsideGeometryComponent" parent="." unique_id=246873114 instance=ExtResource("5_qjkh3")]
 position = Vector2(0, -6)
 
-[node name="EnemyDetectionHitbox" type="Area2D" parent="." unique_id=1035412416]
+[node name="EnemyDetectionHitbox" type="Area2D" parent="." unique_id=1333180453]
 position = Vector2(0, -7)
 collision_layer = 0
 collision_mask = 144
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="EnemyDetectionHitbox" unique_id=1426721893]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="EnemyDetectionHitbox" unique_id=1137410471]
 shape = SubResource("CircleShape2D_g1dw6")
 debug_color = Color(0.600112, 0.36984047, 1, 0.41960785)
 
-[node name="OneWayPlatformDetector" type="ShapeCast2D" parent="." unique_id=825853024]
+[node name="OneWayPlatformDetector" type="ShapeCast2D" parent="." unique_id=372036092]
 unique_name_in_owner = true
 shape = SubResource("RectangleShape2D_qjkh3")
 target_position = Vector2(0, 0)
 collision_mask = 64
 
-[node name="AIController2D" type="Node2D" parent="." unique_id=152124458 node_paths=PackedStringArray("_target_player")]
+[node name="AIController2D" type="Node2D" parent="." unique_id=1558492916]
 script = ExtResource("6_g6k8r")
-_target_player = NodePath("..")
-control_mode = 2
 metadata/_custom_type_script = "uid://c653qopt5xya"
 
 [connection signal="body_entered" from="EnemyDetectionHitbox" to="." method="_on_enemy_detection_hitbox_body_entered"]

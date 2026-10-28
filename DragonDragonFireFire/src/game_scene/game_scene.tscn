@@ -9,8 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://pwy1g0xius4r" path="res://ui/pause_overlay.tscn" id="4_e0oqy"]
 [ext_resource type="Shader" uid="uid://cew32kpokoxdg" path="res://shaders/incinerate.gdshader" id="6_mw77h"]
 [ext_resource type="Script" uid="uid://djmjyhwmjdg5l" path="res://enemies/enemy_controller.gd" id="9_mw77h"]
-[ext_resource type="Script" uid="uid://6cwc5sby7nvt" path="res://addons/godot_rl_agents/sync.gd" id="10_mmqx0"]
-[ext_resource type="PackedScene" uid="uid://dk42xswvh07t0" path="res://player/player.tscn" id="11_fx1fl"]
+[ext_resource type="Script" uid="uid://c367ap35jjsv8" path="res://addons/godot_rl_agents/sync.gd" id="10_mmqx0"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_fx1fl"]
 shader = ExtResource("6_mw77h")
@@ -18,7 +17,7 @@ shader_parameter/fade_duration = 0.30000001355148
 shader_parameter/step_delay = 0.10000000475
 shader_parameter/current_time = 0.0
 
-[sub_resource type="Shader" id="Shader_fx1fl"]
+[sub_resource type="Shader" id="Shader_mmqx0"]
 resource_local_to_scene = true
 code = "shader_type canvas_item;
 
@@ -59,26 +58,24 @@ void fragment()
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_adbct"]
 resource_local_to_scene = true
-shader = SubResource("Shader_fx1fl")
+shader = SubResource("Shader_mmqx0")
 shader_parameter/clear_progress = 1.0
 
-[node name="GameScene" type="Node2D" unique_id=1250721174]
+[node name="GameScene" type="Node2D" unique_id=1812490672]
 script = ExtResource("1_k340r")
 
-[node name="Stage1" parent="." unique_id=763194540 instance=ExtResource("1_n4lbc")]
+[node name="Stage1" parent="." unique_id=227916486 instance=ExtResource("1_n4lbc")]
 
-[node name="Player2" parent="Stage1" unique_id=1110192731 instance=ExtResource("11_fx1fl")]
+[node name="GameUI" parent="." unique_id=1530380076 instance=ExtResource("2_m1k14")]
 
-[node name="GameUI" parent="." unique_id=842278130 instance=ExtResource("2_m1k14")]
-
-[node name="PlayerCutscene" parent="." unique_id=848225277 instance=ExtResource("3_8l73x")]
+[node name="PlayerCutscene" parent="." unique_id=1007117892 instance=ExtResource("3_8l73x")]
 material = SubResource("ShaderMaterial_fx1fl")
 position = Vector2(-8, 172)
 
-[node name="PauseOverlay" parent="." unique_id=504408584 instance=ExtResource("4_e0oqy")]
+[node name="PauseOverlay" parent="." unique_id=212027175 instance=ExtResource("4_e0oqy")]
 visible = false
 
-[node name="GameOverLabel" type="Label" parent="." unique_id=2117190860]
+[node name="GameOverLabel" type="Label" parent="." unique_id=128214781]
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
@@ -92,16 +89,16 @@ grow_horizontal = 2
 grow_vertical = 2
 text = "TIME OVER!"
 
-[node name="TransitionRect" parent="." unique_id=1586586090 instance=ExtResource("3_mw77h")]
+[node name="TransitionRect" parent="." unique_id=2028928197 instance=ExtResource("3_mw77h")]
 material = SubResource("ShaderMaterial_adbct")
 custom_minimum_size = Vector2(320, 180)
 
-[node name="TimeController" type="Node" parent="." unique_id=1240468612]
+[node name="TimeController" type="Node" parent="." unique_id=646871661]
 script = ExtResource("3_3kg8t")
 
-[node name="EnemyController" type="Node" parent="." unique_id=798060351]
+[node name="EnemyController" type="Node" parent="." unique_id=1611228009]
 script = ExtResource("9_mw77h")
 
-[node name="Sync" type="Node" parent="." unique_id=382008089]
+[node name="Sync" type="Node" parent="." unique_id=207455386]
 script = ExtResource("10_mmqx0")
-metadata/_custom_type_script = "uid://6cwc5sby7nvt"
+metadata/_custom_type_script = "uid://c367ap35jjsv8"

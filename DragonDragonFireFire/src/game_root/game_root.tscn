@@ -30,17 +30,17 @@ resource_local_to_scene = true
 shader = ExtResource("3_6nmxx")
 shader_parameter/viewport_tex = SubResource("ViewportTexture_d5gm5")
 
-[node name="GameRoot" type="Node2D" unique_id=68561742]
+[node name="GameRoot" type="Node2D" unique_id=924812137]
 script = ExtResource("1_lssg5")
 
-[node name="RenderRectShader" type="ColorRect" parent="." unique_id=1953564339]
+[node name="RenderRectShader" type="ColorRect" parent="." unique_id=600376522]
 unique_name_in_owner = true
 material = SubResource("ShaderMaterial_6nmxx")
 offset_right = 1920.0
 offset_bottom = 1080.0
 metadata/_edit_use_anchors_ = true
 
-[node name="RenderRectNoShader" type="ColorRect" parent="." unique_id=1729157409]
+[node name="RenderRectNoShader" type="ColorRect" parent="." unique_id=974330778]
 unique_name_in_owner = true
 visible = false
 texture_filter = 1
@@ -50,12 +50,12 @@ offset_left = -2.0
 offset_right = 1918.0
 offset_bottom = 1080.0
 
-[node name="GameViewport" type="SubViewport" parent="." unique_id=1364151383]
+[node name="GameViewport" type="SubViewport" parent="." unique_id=2036088434]
 unique_name_in_owner = true
 snap_2d_transforms_to_pixel = true
 size = Vector2i(320, 180)
 
-[node name="SceneContainer" type="Node2D" parent="GameViewport" unique_id=1791641682]
+[node name="SceneContainer" type="Node2D" parent="GameViewport" unique_id=1779731931]
 unique_name_in_owner = true
 
-[node name="TitleScreen" parent="GameViewport/SceneContainer" unique_id=2045636384 instance=ExtResource("3_lssg5")]
+[node name="TitleScreen" parent="GameViewport/SceneContainer" unique_id=1100934752 instance=ExtResource("3_lssg5")]

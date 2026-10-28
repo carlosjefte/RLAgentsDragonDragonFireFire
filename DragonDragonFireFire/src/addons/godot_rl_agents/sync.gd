@@ -1,20 +1,30 @@
 extends Node
+class_name Sync
 
 # --fixed-fps 2000 --disable-render-loop
 
-enum ControlModes { HUMAN, TRAINING, ONNX_INFERENCE }
+enum ControlModes {
+	HUMAN, ## Test the environment manually
+	TRAINING, ## Train a model
+	ONNX_INFERENCE ## Load a pretrained model using an .onnx file
+}
 @export var control_mode: ControlModes = ControlModes.TRAINING
+## Action will be repeated for n frames (Godot physics steps).
 @export_range(1, 10, 1, "or_greater") var action_repeat := 8
+## Speeds up the physics in the environment to enable faster training.
 @export_range(0, 10, 0.1, "or_greater") var speed_up := 1.0
+## The path to a trained .onnx model file to use for inference (only needed for the 'Onnx Inference' control mode).
 @export var onnx_model_path := ""
+## Whether the inference will be deterministic (NOTE: Only applies to discrete actions in onnx inference mode)
+@export var deterministic_inference := true
 
-# Modelo Onnx armazenado para cada caminho solicitado
+# Onnx model stored for each requested path
 var onnx_models: Dictionary
 
 @onready var start_time = Time.get_ticks_msec()
 
 const MAJOR_VERSION := "0"
-const MINOR_VERSION := "7" 
+const MINOR_VERSION := "7"
 const DEFAULT_PORT := "11008"
 const DEFAULT_SEED := "1"
 var stream: StreamPeerTCP = null
@@ -24,11 +34,15 @@ var should_connect = true
 
 var all_agents: Array
 var agents_training: Array
+## Policy name of each agent, for use with multi-policy multi-agent RL cases
+var agents_training_policy_names: Array[String] = ["shared_policy"]
 var agents_inference: Array
 var agents_heuristic: Array
 
 ## For recording expert demos
 var agent_demo_record: Node
+## File path for writing recorded trajectories
+var expert_demo_save_path: String
 ## Stores recorded trajectories
 var demo_trajectories: Array
 ## A trajectory includes obs: Array, acts: Array, terminal (set in Python env instead)
@@ -41,22 +55,14 @@ var just_reset = false
 var onnx_model = null
 var n_action_steps = 0
 
-var _action_space: Dictionary
+var _action_space_training: Array[Dictionary] = []
 var _action_space_inference: Array[Dictionary] = []
-var _obs_space: Dictionary
+var _obs_space_training: Array[Dictionary] = []
 
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-	print("########################################")
-	print(">>> SYNC DO PLUGIN FOI CARREGADO")
-	print(">>> CAMINHO: addons/godot_rl_agents/sync.gd")
-	print("########################################")
-
-	args = _get_args()
-#	_get_agents()
-	
-	await get_tree().root.ready
+	await get_parent().ready
 	get_tree().set_pause(true)
 	_initialize()
 	await get_tree().create_timer(1.0).timeout
@@ -89,8 +95,11 @@ func _initialize():
 
 func _initialize_training_agents():
 	if agents_training.size() > 0:
-		_obs_space = agents_training[0].get_obs_space()
-		_action_space = agents_training[0].get_action_space()
+		_obs_space_training.resize(agents_training.size())
+		_action_space_training.resize(agents_training.size())
+		for agent_idx in range(0, agents_training.size()):
+			_obs_space_training[agent_idx] = agents_training[agent_idx].get_obs_space()
+			_action_space_training[agent_idx] = agents_training[agent_idx].get_action_space()
 		connected = connect_to_server()
 		if connected:
 			_set_heuristic("model", agents_training)
@@ -113,7 +122,8 @@ func _initialize_inference_agents():
 			onnx_models[onnx_model_path] = ONNXModel.new(onnx_model_path, 1)
 
 		for agent in agents_inference:
-			_action_space_inference.append(agent.get_action_space())
+			var action_space = agent.get_action_space()
+			_action_space_inference.append(action_space)
 
 			var agent_onnx_model: ONNXModel
 			if agent.onnx_model_path.is_empty():
@@ -146,11 +156,20 @@ func _initialize_inference_agents():
 				agent_onnx_model = onnx_models[agent.onnx_model_path]
 
 			agent.onnx_model = agent_onnx_model
+			if not agent_onnx_model.action_means_only_set:
+				agent_onnx_model.set_action_means_only(action_space)
+
 		_set_heuristic("model", agents_inference)
 
 
 func _initialize_demo_recording():
 	if agent_demo_record:
+		expert_demo_save_path = agent_demo_record.expert_demo_save_path
+		assert(
+			not expert_demo_save_path.is_empty(),
+			"Expert demo save path set in %s is empty." % agent_demo_record.get_path()
+		)
+
 		InputMap.add_action("RemoveLastDemoEpisode")
 		InputMap.action_add_event(
 			"RemoveLastDemoEpisode", agent_demo_record.remove_last_episode_key
@@ -182,11 +201,13 @@ func _training_process():
 	if connected:
 		get_tree().set_pause(true)
 
+		var obs = _get_obs_from_agents(agents_training)
+		var info = _get_info_from_agents(agents_training)
+
 		if just_reset:
 			just_reset = false
-			var obs = _get_obs_from_agents(agents_training)
 
-			var reply = {"type": "reset", "obs": obs}
+			var reply = {"type": "reset", "obs": obs, "info": info}
 			_send_dict_as_json_message(reply)
 			# this should go straight to getting the action and setting it checked the agent, no need to perform one phyics tick
 			get_tree().set_pause(false)
@@ -195,19 +216,10 @@ func _training_process():
 		if need_to_send_obs:
 			need_to_send_obs = false
 			var reward = _get_reward_from_agents()
-			var info = _get_info_from_agents()
 			var done = _get_done_from_agents()
 			#_reset_agents_if_done() # this ensures the new observation is from the next env instance : NEEDS REFACTOR
 
-			var obs = _get_obs_from_agents(agents_training)
-
-			var reply = {
-				"type": "step",
-				"obs": obs,
-				"reward": reward,
-				"done": done,
-				"info": info
-			}
+			var reply = {"type": "step", "obs": obs, "reward": reward, "done": done, "info": info}
 			_send_dict_as_json_message(reply)
 
 		var handled = handle_message()
@@ -219,12 +231,10 @@ func _inference_process():
 		var actions = []
 
 		for agent_id in range(0, agents_inference.size()):
-			var action = agents_inference[agent_id].onnx_model.run_inference(
-				obs[agent_id]["obs"], 1.0
-			)
-			action["output"] = clamp_array(action["output"], -1.0, 1.0)
+			var model: ONNXModel = agents_inference[agent_id].onnx_model
+			var action = model.run_inference(obs[agent_id], 1.0)
 			var action_dict = _extract_action_dict(
-				action["output"], _action_space_inference[agent_id]
+				action["output"], _action_space_inference[agent_id], model.action_means_only
 			)
 			actions.append(action_dict)
 
@@ -278,16 +288,59 @@ func _heuristic_process():
 		_reset_agents_if_done(agents_heuristic)
 
 
-func _extract_action_dict(action_array: Array, action_space: Dictionary):
+func _extract_action_dict(action_array: Array, action_space: Dictionary, action_means_only: bool):
 	var index = 0
 	var result = {}
 	for key in action_space.keys():
 		var size = action_space[key]["size"]
-		if action_space[key]["action_type"] == "discrete":
-			result[key] = round(action_array[index])
+		var action_type = action_space[key]["action_type"]
+
+		if action_type == "discrete":
+			var largest_logit: float = -INF  # Value of the largest logit for this action in the actions array
+			var largest_logit_idx: int  # Index of the largest logit for this action in the actions array
+			for logit_idx in range(0, size):
+				var logit_value = action_array[index + logit_idx]
+				if logit_value > largest_logit:
+					largest_logit = logit_value
+					largest_logit_idx = logit_idx
+			if deterministic_inference:
+				result[key] = largest_logit_idx  # Index of the largest logit is the discrete action value
+			else:
+				var exp_logit_sum: float  # Sum of exp of each logit
+				var exp_logits: Array[float]
+
+				for logit_idx in range(0, size):
+					# Normalize using the max logit to add stability in case a logit would be huge after exp
+					exp_logits.append(exp(action_array[index + logit_idx] - largest_logit))
+					exp_logit_sum += exp_logits[logit_idx]
+
+				# Choose a random number, will be used to select an action
+				var random_value = randf_range(0, exp_logit_sum)
+
+				# Select the first index at which the sum is larger than the random number
+				var sum: float
+				for exp_logit_idx in exp_logits.size():
+					sum += exp_logits[exp_logit_idx]
+					if sum > random_value:
+						result[key] = exp_logit_idx
+						break
+			index += size
+		elif action_type == "continuous":
+			# For continous actions, we only take the action mean values
+			result[key] = clamp_array(action_array.slice(index, index + size), -1.0, 1.0)
+			if action_means_only:
+				index += size  # model only outputs action means, so we move index by size
+			else:
+				index += size * 2  # model outputs logstd after action mean, we skip the logstd part
+
 		else:
-			result[key] = action_array.slice(index, index + size)
-		index += size
+			assert(
+				false,
+				(
+					'Only "discrete" and "continuous" action types supported. Found: %s action type set.'
+					% action_type
+				)
+			)
 
 	return result
 
@@ -308,7 +361,13 @@ func _set_agent_mode(agent: Node):
 
 func _get_agents():
 	all_agents = get_tree().get_nodes_in_group("AGENT")
+	agents_training.clear()
+	agents_inference.clear()
+	agents_heuristic.clear()
+	
 	for agent in all_agents:
+		if not is_instance_valid(agent):
+			continue
 		_set_agent_mode(agent)
 
 		if agent.control_mode == agent.ControlModes.TRAINING:
@@ -323,6 +382,11 @@ func _get_agents():
 				"Currently only a single AIController can be used for recording expert demos."
 			)
 			agent_demo_record = agent
+
+	var training_agent_count = agents_training.size()
+	agents_training_policy_names.resize(training_agent_count)
+	for i in range(0, training_agent_count):
+		agents_training_policy_names[i] = agents_training[i].policy_name
 
 
 func _set_heuristic(heuristic, agents: Array):
@@ -373,9 +437,10 @@ func _send_env_info():
 
 	var message = {
 		"type": "env_info",
-		"observation_space": _obs_space,
-		"action_space": _action_space,
-		"n_agents": len(agents_training)
+		"observation_space": _obs_space_training,
+		"action_space": _action_space_training,
+		"n_agents": len(agents_training),
+		"agent_policy_names": agents_training_policy_names
 	}
 	_send_dict_as_json_message(message)
 
@@ -501,41 +566,57 @@ func _reset_agents(agents = all_agents):
 
 
 func _get_obs_from_agents(agents: Array = all_agents):
+	# Atualiza a lista de agentes antes de coletar para remover instâncias órfãs/liberadas
+	_get_agents()
+	
 	var obs = []
 	for agent in agents:
-		obs.append(agent.get_obs())
+		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
+			obs.append(agent.get_obs())
+		else:
+			# Retorna um observatório vazio/zerado se o agente da fase anterior sumiu
+			obs.append({"obs": []})
 	return obs
 
 
 func _get_reward_from_agents(agents: Array = agents_training):
 	var rewards = []
 	for agent in agents:
-		rewards.append(agent.get_reward())
-		agent.zero_reward()
+		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
+			rewards.append(agent.get_reward())
+			agent.zero_reward()
+		else:
+			rewards.append(0.0)
 	return rewards
+
+
+func _get_info_from_agents(agents: Array = all_agents):
+	var info = []
+	for agent in agents:
+		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
+			info.append(agent.get_info())
+		else:
+			info.append({})
+	return info
 
 
 func _get_done_from_agents(agents: Array = agents_training):
 	var dones = []
 	for agent in agents:
-		var done = agent.get_done()
-		if done:
-			agent.set_done_false()
-		dones.append(done)
+		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
+			var done = agent.get_done()
+			if done:
+				agent.set_done_false()
+			dones.append(done)
+		else:
+			dones.append(true) # Considera concluído se o agente foi destruído na troca de fase
 	return dones
-
-func _get_info_from_agents(agents: Array = agents_training):
-	var infos = []
-
-	for agent in agents:
-		infos.append(agent.get_info())
-
-	return infos
 
 
 func _set_agent_actions(actions, agents: Array = all_agents):
-	for i in range(len(actions)):
-		agents[i].set_action(actions[i])
+	for i in range(min(len(actions), len(agents))):
+		if is_instance_valid(agents[i]) and not agents[i].is_queued_for_deletion():
+			agents[i].set_action(actions[i])
 
 
 func clamp_array(arr: Array, min: float, max: float):
@@ -545,14 +626,14 @@ func clamp_array(arr: Array, min: float, max: float):
 	return output
 
 
-## Save recorded export demos on window exit (Close window instead of "Stop" button in Godot Editor)
+## Save recorded export demos on window exit (Close game window instead of "Stop" button in Godot Editor)
 func _notification(what):
-	if not agent_demo_record:
+	if demo_trajectories.size() == 0 or expert_demo_save_path.is_empty():
 		return
 
 	if what == NOTIFICATION_PREDELETE:
 		var json_string = JSON.stringify(demo_trajectories, "", false)
-		var file = FileAccess.open(agent_demo_record.expert_demo_save_path, FileAccess.WRITE)
+		var file = FileAccess.open(expert_demo_save_path, FileAccess.WRITE)
 
 		if not file:
 			var error: Error = FileAccess.get_open_error()
