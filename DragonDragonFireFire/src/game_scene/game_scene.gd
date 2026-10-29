@@ -30,6 +30,10 @@ var _current_stage_starting_pos : Vector2 = Vector2.ZERO
 
 @onready var _current_stage : Stage = $Stage1
 
+# Adicione estas variáveis no topo da classe GameScene (junto com as outras variáveis de estado)
+var consecutive_stages_passed : int = 0
+var max_consecutive_stages_record : int = 0
+
 
 func _init() -> void:
 	# Pick the first color fixed pink.
@@ -130,14 +134,14 @@ func _transition_stages() -> void:
 	GameState.cutscene = true
 
 	GameState.current_stage += 1
+	print("[GameScene] Fase concluída! Avançando para o nível: %d" % GameState.current_stage)
 
-	# Cycle through stage colors.
+	# Restante do código original de transição...
 	var num_colors : int = GeometryColorDefinitions.Colors.size()
 	GameState.next_color = (int(GameState.next_color) + 1) % num_colors as GeometryColorDefinitions.Colors
 
-	# Determine the next stage to load, rotating cyclically through the available stages.
 	var num_stages : int = StageDefinitions.STAGES_DICT.size()
-	var next_stage_number : int = (GameState.current_stage - 1) % num_stages + 1 # Stages are 1-indexed.
+	var next_stage_number : int = (GameState.current_stage - 1) % num_stages + 1
 
 	_next_stage = StageDefinitions.STAGES_DICT[next_stage_number].instantiate()
 	add_child(_next_stage)
@@ -185,8 +189,20 @@ func _callback_transition_finished() -> void:
 	_current_stage.do_setup()
 
 
+func _is_training_mode() -> bool:
+	var sync_node = get_tree().current_scene.find_child("Sync", true, false)
+	if sync_node and "control_mode" in sync_node:
+		# Supondo que 1 seja o modo TRAINING conforme verificado anteriormente
+		if sync_node.control_mode == 1:
+			return true
+	return false
+
+
 func _on_player_died() -> void:
-	assert(_cur_state != State.PLAYER_DEAD)
+	# Se o player já estiver morto, ignora chamadas duplicadas no mesmo ciclo de morte/respawn
+	if _cur_state == State.PLAYER_DEAD:
+		return
+
 	_cur_state = State.PLAYER_DEAD
 	SoundPool.play_sound(SoundPool.SOUND_PLAYER_HURT)
 
@@ -194,18 +210,32 @@ func _on_player_died() -> void:
 	_time_controller.set_running(false)
 
 	var player : Player = _current_stage.get_player()
-	_player_cutscene.global_position = player.global_position
+	if is_instance_valid(player):
+		_player_cutscene.global_position = player.global_position
+		player.visible = false
 
 	_player_cutscene.play_body("hurt")
 	_player_cutscene.play_head("invisible")
 	_player_cutscene.visible = true
-	player.visible = false
 
 	GameState.lives -= 1
+	
 	if GameState.lives <= 0:
-		_game_over_label.visible = true
-		_game_over_label.text = "GAME OVER!"
-		_do_game_over_transition()
+		if _is_training_mode():
+			print("[GameScene] Vidas esgotadas no modo treino. Resetando o progresso de fases.")
+			if is_instance_valid(player):
+				var agent_controller = player.find_child("PlayerAIController", true, false)
+				if agent_controller and agent_controller.has_method("apply_heavy_penalty"):
+					agent_controller.apply_heavy_penalty()
+			
+			# Reseta o GameState (isso redefine o current_stage para 1, as vidas e o score)
+			GameState.reset_game_state()
+			
+			_do_death_transition()
+		else:
+			_game_over_label.visible = true
+			_game_over_label.text = "GAME OVER!"
+			_do_game_over_transition()
 	else:
 		_do_death_transition()
 
@@ -225,9 +255,13 @@ func _on_time_over() -> void:
 	_player_cutscene.visible = true
 	player.visible = false
 
-	_game_over_label.visible = true
-	_game_over_label.text = "TIME OVER!"
-	_do_game_over_transition()
+	if _is_training_mode():
+		GameState.reset_game_state()
+		_do_death_transition()
+	else:
+		_game_over_label.visible = true
+		_game_over_label.text = "TIME OVER!"
+		_do_game_over_transition()
 
 
 func _do_death_transition() -> void:

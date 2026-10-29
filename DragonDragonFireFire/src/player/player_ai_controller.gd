@@ -19,12 +19,29 @@ const MAX_ITEMS_OBS: int = 2
 const MAX_PLATFORMS_OBS: int = 3
 
 func _get_player_safely() -> Player:
+	var root = get_tree().current_scene
+	if not root:
+		return null
+		
+	# Busca por todos os nós que são do tipo Player na árvore de cena atual
+	var players = _find_all_players(root)
+	if players.size() > 0:
+		# Retorna o player mais recente (último da lista)
+		return players[players.size() - 1] as Player
+		
+	# Fallback caso não encontre pela busca recursiva
 	var p = get_parent()
 	while p and not p is Player:
 		p = p.get_parent()
-	if not p:
-		p = get_tree().current_scene.find_child("Player", true, false)
 	return p as Player
+
+func _find_all_players(node: Node) -> Array:
+	var results = []
+	if node is Player:
+		results.append(node)
+	for child in node.get_children():
+		results.append_array(_find_all_players(child))
+	return results
 
 func get_action_space() -> Dictionary:
 	return {
@@ -36,10 +53,10 @@ func get_action_space() -> Dictionary:
 	}
 
 func set_action(action) -> void:
+	# Sempre atualiza para pegar o player mais recente antes de aplicar a ação
+	player = _get_player_safely()
 	if not is_instance_valid(player):
-		player = _get_player_safely()
-		if not player:
-			return
+		return
 
 	var get_val = func(act_key, default = 0.0):
 		if not action.has(act_key):
@@ -64,10 +81,9 @@ func set_action(action) -> void:
 	player.ai_input_down = ai_input_down
 
 func get_obs() -> Dictionary:
+	player = _get_player_safely()
 	if not is_instance_valid(player) or player.is_queued_for_deletion():
-		player = _get_player_safely()
-		if not is_instance_valid(player):
-			return { "obs": [] }
+		return { "obs": [] }
 
 	var obs: Array = []
 	obs.append(player.velocity.x)
@@ -166,6 +182,7 @@ func get_obs_space() -> Dictionary:
 	}
 
 func get_reward() -> float:
+	player = _get_player_safely()
 	if not is_instance_valid(player):
 		return 0.0
 		
@@ -220,3 +237,9 @@ func _find_platforms(node: Node) -> Array:
 	for child in node.get_children():
 		results.append_array(_find_platforms(child))
 	return results
+
+func get_info() -> Dictionary:
+	return {
+		"level": GameState.current_stage
+	}
+	

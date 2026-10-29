@@ -141,7 +141,7 @@ parser.add_argument("--viz", action="store_true", default=False)
 parser.add_argument("--speedup", default=1, type=int)
 parser.add_argument("--n_parallel", default=1, type=int)
 
-# Novos argumentos específicos para controle por fases no DragonDragonFireFire
+# Argumentos específicos para controle por fases no DragonDragonFireFire
 parser.add_argument(
     "--target_level",
     default=None,

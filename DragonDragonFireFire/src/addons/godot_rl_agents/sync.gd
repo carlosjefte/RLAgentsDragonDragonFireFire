@@ -108,7 +108,7 @@ func _initialize_training_agents():
 		else:
 			push_warning(
 				"Couldn't connect to Python server, using human controls instead. ",
-				"Did you start the training server using e.g. `gdrl` from the console?"
+                "Did you start the training server using e.g. `gdrl` from the console?"
 			)
 
 
@@ -140,7 +140,7 @@ func _initialize_inference_agents():
 				prints(
 					"Info: AIController %s" % agent.get_path(),
 					"has no onnx model path set.",
-					"Using path set on the sync node instead."
+                    "Using path set on the sync node instead."
 				)
 				agent_onnx_model = onnx_models[onnx_model_path]
 			else:
@@ -148,7 +148,7 @@ func _initialize_inference_agents():
 					assert(
 						FileAccess.file_exists(agent.onnx_model_path),
 						(
-							"Onnx Model Path set on %s node does not exist: %s"
+                            "Onnx Model Path set on %s node does not exist: %s"
 							% [agent.get_path(), agent.onnx_model_path]
 						)
 					)
@@ -260,7 +260,7 @@ func _demo_record_process():
 	# Get the current obs from the agent
 	assert(
 		obs_dict.has("obs"),
-		"Demo recorder needs an 'obs' key in get_obs() returned dictionary to record obs from."
+        "Demo recorder needs an 'obs' key in get_obs() returned dictionary to record obs from."
 	)
 	current_demo_trajectory[0].append(obs_dict.obs)
 
@@ -337,7 +337,7 @@ func _extract_action_dict(action_array: Array, action_space: Dictionary, action_
 			assert(
 				false,
 				(
-					'Only "discrete" and "continuous" action types supported. Found: %s action type set.'
+                    'Only "discrete" and "continuous" action types supported. Found: %s action type set.'
 					% action_type
 				)
 			)
@@ -366,7 +366,7 @@ func _get_agents():
 	agents_heuristic.clear()
 	
 	for agent in all_agents:
-		if not is_instance_valid(agent):
+		if not is_instance_valid(agent) or agent.is_queued_for_deletion():
 			continue
 		_set_agent_mode(agent)
 
@@ -377,11 +377,12 @@ func _get_agents():
 		elif agent.control_mode == agent.ControlModes.HUMAN:
 			agents_heuristic.append(agent)
 		elif agent.control_mode == agent.ControlModes.RECORD_EXPERT_DEMOS:
-			assert(
-				not agent_demo_record,
-				"Currently only a single AIController can be used for recording expert demos."
-			)
-			agent_demo_record = agent
+			if not agent_demo_record:
+				agent_demo_record = agent
+
+	# Garante estritamente que apenas o player mais recente (último) seja usado no treino
+	if agents_training.size() > 1:
+		agents_training = [agents_training[agents_training.size() - 1]]
 
 	var training_agent_count = agents_training.size()
 	agents_training_policy_names.resize(training_agent_count)
@@ -410,16 +411,20 @@ func _handshake():
 
 
 func _get_dict_json_message():
-	# returns a dictionary from of the most recent message
-	# this is not waiting
+	var max_retries = 100000 
+	var retries = 0
+	
 	while stream.get_available_bytes() == 0:
 		stream.poll()
-		if stream.get_status() != 2:
-			print("server disconnected status, closing")
+		if stream.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			print("Servidor desconectado ou status inválido, encerrando conexão.")
 			get_tree().quit()
 			return null
-
-		OS.delay_usec(10)
+			
+		retries += 1
+		if retries > max_retries:
+			OS.delay_usec(100)
+			retries = 0
 
 	var message = stream.get_string()
 	var json_data = JSON.parse_string(message)
@@ -451,13 +456,11 @@ func connect_to_server():
 	print("trying to connect to server")
 	stream = StreamPeerTCP.new()
 
-	# "localhost" was not working on windows VM, had to use the IP
 	var ip = "127.0.0.1"
 	var port = _get_port()
 	var connect = stream.connect_to_host(ip, port)
-	stream.set_no_delay(true)  # TODO check if this improves performance or not
+	stream.set_no_delay(true)  
 	stream.poll()
-	# Fetch the status until it is either connected (2) or failed to connect (3)
 	while stream.get_status() < 2:
 		stream.poll()
 	return stream.get_status() == 2
@@ -472,8 +475,6 @@ func _get_args():
 			var key_value = argument.split("=")
 			arguments[key_value[0].lstrip("--")] = key_value[1]
 		else:
-			# Options without an argument will be present in the dictionary,
-			# with the value set to an empty string.
 			arguments[argument.lstrip("--")] = ""
 
 	return arguments
@@ -502,8 +503,10 @@ func disconnect_from_server():
 
 
 func handle_message() -> bool:
-	# get json message: reset, step, close
 	var message = _get_dict_json_message()
+	if message == null:
+		return true
+
 	if message["type"] == "close":
 		print("received close message, closing game")
 		get_tree().quit()
@@ -515,15 +518,6 @@ func handle_message() -> bool:
 		_reset_agents()
 		just_reset = true
 		get_tree().set_pause(false)
-		#print("resetting forcing draw")
-#        RenderingServer.force_draw()
-#        var obs = _get_obs_from_agents()
-#        print("obs ", obs)
-#        var reply = {
-#            "type": "reset",
-#            "obs": obs
-#        }
-#        _send_dict_as_json_message(reply)
 		return true
 
 	if message["type"] == "call":
@@ -548,75 +542,108 @@ func handle_message() -> bool:
 func _call_method_on_agents(method):
 	var returns = []
 	for agent in all_agents:
-		returns.append(agent.call(method))
-
+		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
+			returns.append(agent.call(method))
 	return returns
 
 
 func _reset_agents_if_done(agents = all_agents):
 	for agent in agents:
-		if agent.get_done():
-			agent.set_done_false()
+		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
+			if agent.get_done():
+				agent.set_done_false()
 
 
 func _reset_agents(agents = all_agents):
 	for agent in agents:
-		agent.needs_reset = true
-		#agent.reset()
+		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
+			agent.needs_reset = true
 
 
 func _get_obs_from_agents(agents: Array = all_agents):
-	# Atualiza a lista de agentes antes de coletar para remover instâncias órfãs/liberadas
 	_get_agents()
 	
 	var obs = []
+	# Pega estritamente apenas o último agente válido para corresponder ao espaço de 1 único ambiente/agente do Python
+	var valid_agents = []
 	for agent in agents:
 		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
-			obs.append(agent.get_obs())
-		else:
-			# Retorna um observatório vazio/zerado se o agente da fase anterior sumiu
-			obs.append({"obs": []})
+			valid_agents.append(agent)
+			
+	if valid_agents.size() > 0:
+		var latest_agent = valid_agents[valid_agents.size() - 1]
+		obs.append(latest_agent.get_obs())
+	else:
+		obs.append({"obs": []})
+		
 	return obs
 
 
 func _get_reward_from_agents(agents: Array = agents_training):
+	_get_agents()
 	var rewards = []
+	var valid_agents = []
 	for agent in agents:
 		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
-			rewards.append(agent.get_reward())
-			agent.zero_reward()
-		else:
-			rewards.append(0.0)
+			valid_agents.append(agent)
+			
+	if valid_agents.size() > 0:
+		var latest_agent = valid_agents[valid_agents.size() - 1]
+		rewards.append(latest_agent.get_reward())
+		latest_agent.zero_reward()
+	else:
+		rewards.append(0.0)
 	return rewards
 
 
-func _get_info_from_agents(agents: Array = all_agents):
-	var info = []
-	for agent in agents:
-		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
-			info.append(agent.get_info())
-		else:
-			info.append({})
-	return info
-
-
 func _get_done_from_agents(agents: Array = agents_training):
+	_get_agents()
 	var dones = []
+	var valid_agents = []
 	for agent in agents:
 		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
-			var done = agent.get_done()
-			if done:
-				agent.set_done_false()
-			dones.append(done)
-		else:
-			dones.append(true) # Considera concluído se o agente foi destruído na troca de fase
+			valid_agents.append(agent)
+			
+	if valid_agents.size() > 0:
+		var latest_agent = valid_agents[valid_agents.size() - 1]
+		var done = latest_agent.get_done()
+		if done:
+			latest_agent.set_done_false()
+		dones.append(done)
+	else:
+		dones.append(true) 
 	return dones
 
 
+func _get_info_from_agents(agents: Array = all_agents):
+	_get_agents()
+	var info = []
+	var valid_agents = []
+	for agent in agents:
+		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
+			valid_agents.append(agent)
+			
+	if valid_agents.size() > 0:
+		var latest_agent = valid_agents[valid_agents.size() - 1]
+		info.append(latest_agent.get_info())
+	else:
+		info.append({})
+	return info
+
+
 func _set_agent_actions(actions, agents: Array = all_agents):
-	for i in range(min(len(actions), len(agents))):
-		if is_instance_valid(agents[i]) and not agents[i].is_queued_for_deletion():
-			agents[i].set_action(actions[i])
+	if actions == null or not (actions is Array):
+		return
+		
+	_get_agents()
+	var valid_agents = []
+	for agent in agents:
+		if is_instance_valid(agent) and not agent.is_queued_for_deletion():
+			valid_agents.append(agent)
+			
+	if valid_agents.size() > 0 and actions.size() > 0:
+		var latest_agent = valid_agents[valid_agents.size() - 1]
+		latest_agent.set_action(actions[0])
 
 
 func clamp_array(arr: Array, min: float, max: float):
@@ -626,7 +653,6 @@ func clamp_array(arr: Array, min: float, max: float):
 	return output
 
 
-## Save recorded export demos on window exit (Close game window instead of "Stop" button in Godot Editor)
 func _notification(what):
 	if demo_trajectories.size() == 0 or expert_demo_save_path.is_empty():
 		return
