@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://cfm6whuvj2n57"]
+[gd_scene format=3 uid="uid://cfm6whuvj2n57"]
 
 [ext_resource type="Script" uid="uid://c2pujn51tm6uu" path="res://geometry/burnable_block.gd" id="1_bxpog"]
 [ext_resource type="Material" uid="uid://dyx1yhurrujxn" path="res://shaders/shader_material_incinerate.tres" id="2_rd2lr"]
@@ -12,40 +12,40 @@ size = Vector2(7.5, 1)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_tlsna"]
 size = Vector2(7.8, 8)
 
-[node name="BurnableBlock8P" type="CharacterBody2D"]
+[node name="BurnableBlock8P" type="CharacterBody2D" unique_id=565606411]
 collision_layer = 4
 collision_mask = 70
 script = ExtResource("1_bxpog")
 variant = 1
 
-[node name="Visuals" type="Node2D" parent="."]
+[node name="Visuals" type="Node2D" parent="." unique_id=1689875181]
 material = ExtResource("2_rd2lr")
 
-[node name="Sprite2D" type="Sprite2D" parent="Visuals"]
+[node name="Sprite2D" type="Sprite2D" parent="Visuals" unique_id=1360400398]
 use_parent_material = true
 position = Vector2(0, -4)
 texture = ExtResource("2_tlsna")
 
-[node name="BurnVisuals" type="Node2D" parent="Visuals"]
+[node name="BurnVisuals" type="Node2D" parent="Visuals" unique_id=611157372]
 use_parent_material = true
 
-[node name="BurnSprite" type="AnimatedSprite2D" parent="Visuals/BurnVisuals"]
+[node name="BurnSprite" type="AnimatedSprite2D" parent="Visuals/BurnVisuals" unique_id=203714843]
 use_parent_material = true
 position = Vector2(0, -4)
 sprite_frames = ExtResource("3_lvq3l")
 autoplay = "default"
 
-[node name="BurnComponent" parent="." instance=ExtResource("3_tlsna")]
+[node name="BurnComponent" parent="." unique_id=904107517 instance=ExtResource("3_tlsna")]
 position = Vector2(0, -4)
 _ignition_range = 6.0
 _catch_fire_range = 4.0
 _catch_burn_time = 1.0
 
-[node name="GroundShapeCast" type="ShapeCast2D" parent="."]
+[node name="GroundShapeCast" type="ShapeCast2D" parent="." unique_id=92427485]
 shape = SubResource("RectangleShape2D_lvq3l")
 target_position = Vector2(0, 0)
 collision_mask = 70
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1506586770]
 position = Vector2(0, -4)
 shape = SubResource("RectangleShape2D_tlsna")

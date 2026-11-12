@@ -15,6 +15,24 @@ const _FIRE_BALL_OFFSET_UP_LEFT : Vector2 = Vector2(-3.0, -16.0)
 const _FIRE_BALL_OFFSET_UP_RIGHT : Vector2 = Vector2(3.0, -16.0)
 const _FIRE_BALL_CADENCE : float = (1.0 / 5.5) # 5.5 per second
 
+# ==========================================
+# DETECÇÃO DE AGENTE PRESO
+# ==========================================
+
+const STUCK_MIN_HORIZONTAL_RANGE: float = 24.0
+const STUCK_GRACE_TIME: float = 2.0
+const STUCK_PENALTY_PER_SECOND: float = 0.25
+# Contador de disparos realizados pela IA.
+var ai_shots_fired_total: int = 0
+var ai_last_shot_direction: Vector2 = Vector2.RIGHT
+
+const STUCK_INPUT_THRESHOLD: float = 0.1
+
+var stuck_timer: float = 0.0
+var stuck_anchor_x: float = 0.0
+
+var is_stuck: bool = false
+
 const _SPEED = 80.0
 const _JUMP_VELOCITY = -166.0
 const _MAX_FALL_SPEED = 130.0
@@ -191,12 +209,14 @@ func _handle_direction_actions() -> void:
 		velocity.x = move_toward(velocity.x, 0, _SPEED)
 
 
+
 func _shoot_fire_ball() -> void:
-	var fire_ball : FireBall = _FIRE_BALL_SCENE.instantiate()
+	var fire_ball: FireBall = _FIRE_BALL_SCENE.instantiate()
 	get_parent().add_child(fire_ball)
 
 	if _looking_up:
 		fire_ball.set_up()
+
 		if _cur_dir == Types.Direction.LEFT:
 			fire_ball.global_position = global_position + _FIRE_BALL_OFFSET_UP_LEFT
 		else:
@@ -208,6 +228,16 @@ func _shoot_fire_ball() -> void:
 		else:
 			fire_ball.set_right()
 			fire_ball.global_position = global_position + _FIRE_BALL_OFFSET_RIGHT
+	
+	if _looking_up:
+		ai_last_shot_direction = Vector2.UP
+	elif _cur_dir == Types.Direction.LEFT:
+		ai_last_shot_direction = Vector2.LEFT
+	else:
+		ai_last_shot_direction = Vector2.RIGHT
+
+	# Registra somente disparos efetivamente realizados.
+	ai_shots_fired_total += 1
 
 	_time_since_last_fire_spit = 0.0
 	SoundPool.play_sound(SoundPool.SOUND_FIRE_SHOT)
